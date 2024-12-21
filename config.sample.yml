@@ -1,0 +1,15 @@
+dirk:
+  # Hostname and port of the Dirk instance.
+  endpoint: dirk.example.com:13141
+
+  # Path to the client certificate to authenticate with Dirk.
+  client_cert: /path/to/certs/client.crt
+
+  # Path to the key to authenticate with Dirk.
+  client_key: /path/to/certs/client.key
+
+  # Path to the Certificate Authority certificate.
+  ca_cert: /path/to/certs/dirk_authority.crt
+
+  # Name of the Wallet
+  wallet: Wallet

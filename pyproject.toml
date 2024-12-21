@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "dirk-tools"
+version = "0.1.0"
+description = ""
+authors = ["concentricspheres <107502292+concentricspheres@users.noreply.github.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.9,<3.12"
+click = "^8.1.7"
+eth-jit-exiter = {git = "https://github.com/CryptoManufaktur-io/eth-jit-exiter.git"}
+pyyaml = "^6.0.2"
+grpcio = "^1.68.1"
+eth2spec = "^1.1.10"
+pyinstaller = "5.10.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

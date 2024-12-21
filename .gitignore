@@ -1,0 +1,17 @@
+.DS_Store
+
+config
+output
+config.yml
+
+# VS Code
+.vscode
+
+__pycache__
+
+# Build executables and resources
+build/
+dirk-tools.spec
+
+# Temporary folder created when building executable
+eth2spec
