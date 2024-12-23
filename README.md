@@ -87,6 +87,10 @@ dirk:
   wallet: Wallet
 ```
 
+## Run with docker
+
+`docker run ghcr.io/cryptomanufaktur-io/dirk-tools:main verify-signature [OPTIONS]`
+
 ## Development
 
 ### Requirements

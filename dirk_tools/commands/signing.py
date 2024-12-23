@@ -46,14 +46,23 @@ def get_accounts(config):
 
     credentials = get_grpc_credentials(config)
 
-    channel = grpc.secure_channel(endpoint, credentials)
-    LOGGER.debug("Waiting for List Accounts channel...")
+    try:
+        channel = grpc.secure_channel(endpoint, credentials)
+        LOGGER.debug("Waiting for List Accounts channel...")
 
-    grpc.channel_ready_future(channel).result()
-    LOGGER.debug("Channel connected!")
+        grpc.channel_ready_future(channel).result(timeout=3)
+        LOGGER.debug("Channel connected!")
+    except grpc.FutureTimeoutError:
+        click.secho(
+            f"gRPC Channel not ready within 3 seconds!",
+            bold=False,
+            fg="red",
+        )
+
+        sys.exit(1)
 
     account_stub = lister_pb2_grpc.ListerStub(channel)
-    accounts = account_stub.ListAccounts(lister_pb2.ListAccountsRequest(paths=[config['dirk']['wallet']]))
+    accounts = account_stub.ListAccounts(lister_pb2.ListAccountsRequest(paths=[config['dirk']['wallet']]), timeout=3)
 
     channel.close()
     LOGGER.debug("Channel closed.")
@@ -103,7 +112,7 @@ def request_signature(endpoint, credentials, account, data, domain):
     try:
         LOGGER.debug(f"Waiting for Sign channel on endpoint {endpoint}...")
         channel = grpc.secure_channel(endpoint, credentials)
-        grpc.channel_ready_future(channel).result()
+        grpc.channel_ready_future(channel).result(timeout=3)
         LOGGER.debug("Channel connected!")
 
         signer_stub = signer_pb2_grpc.SignerStub(channel)
@@ -112,7 +121,7 @@ def request_signature(endpoint, credentials, account, data, domain):
             account=account.name,
             data=data,
             domain=domain
-        ))
+        ), timeout=3)
 
         channel.close()
         LOGGER.debug("Sign Channel closed.")
@@ -174,41 +183,50 @@ def sign_arbitrary_message(
     if not os.path.exists(output_dir):
         os.mkdir(output_dir)
 
-    for public_key in accounts:
-        LOGGER.info(f"Signing with key 0x{public_key}")
+    try:
+        for public_key in accounts:
+            LOGGER.info(f"Signing with key 0x{public_key}")
 
-        data = ArbitraryMessage(
-            message=sha256(message.encode("utf-8")).digest(),
+            data = ArbitraryMessage(
+                message=sha256(message.encode("utf-8")).digest(),
+            )
+
+            signing_root = compute_signing_root(data, domain)
+
+            signature = parallel_sign_requests(
+                credentials=credentials,
+                account=accounts[public_key],
+                data=data.hash_tree_root(),
+                domain=domain
+            )
+
+            LOGGER.info(f"Domain: 0x{domain_hex}")
+            LOGGER.info(f"hash tree root: {data.hash_tree_root()}")
+            LOGGER.info(f"Signing root: {signing_root}")
+            LOGGER.info(f"Signature: {signature}")
+
+            valid = bls.Verify(BLSPubkey.fromhex(public_key), signing_root, signature)
+
+            LOGGER.info(f"Valid: {valid}")
+
+            filename = f"pubkey_{public_key}.yaml"
+
+            with open(os.path.join(output_dir, filename), "w") as f:
+                f.write(yaml.dump({
+                    "pubkey": f"0x{public_key}",
+                    "message_body": message,
+                    "hash_tree_root": str(data.hash_tree_root()),
+                    "domain": f"0x{domain.hex()}",
+                    "signature": str(signature)
+                }))
+    except Exception as e:
+        click.secho(
+            f"Error found while signing: {e}",
+            bold=False,
+            fg="red",
         )
 
-        signing_root = compute_signing_root(data, domain)
-
-        signature = parallel_sign_requests(
-            credentials=credentials,
-            account=accounts[public_key],
-            data=data.hash_tree_root(),
-            domain=domain
-        )
-
-        LOGGER.info(f"Domain: 0x{domain_hex}")
-        LOGGER.info(f"hash tree root: {data.hash_tree_root()}")
-        LOGGER.info(f"Signing root: {signing_root}")
-        LOGGER.info(f"Signature: {signature}")
-
-        valid = bls.Verify(BLSPubkey.fromhex(public_key), signing_root, signature)
-
-        LOGGER.info(f"Valid: {valid}")
-
-        filename = f"pubkey_{public_key}.yaml"
-
-        with open(os.path.join(output_dir, filename), "w") as f:
-            f.write(yaml.dump({
-                "pubkey": f"0x{public_key}",
-                "message_body": message,
-                "hash_tree_root": str(data.hash_tree_root()),
-                "domain": f"0x{domain.hex()}",
-                "signature": str(signature)
-            }))
+        sys.exit(1)
 
     click.secho(
         f"Signed {len(accounts)} messages.\n",
